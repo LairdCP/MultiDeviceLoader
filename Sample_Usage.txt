@@ -1,0 +1,27 @@
+Command line parameters:
+ 
+    RunOnExit=n        1 = run application when downloaded, 0 = do not run application when downloaded
+    EraseFS=n          1 = erase file-system, 0 = do not erase file-system
+    XCompile=n         1 = XCompile source and download application (Windows only), 0 = download application as-is
+    FlowControl=n      1 = Hardware flow control, 2 = Software flow control, 0 = No flow control
+    Baud=n             Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900)
+    DownloadFile=n     Path and filename to XCompile/download
+    RenameFile=n       Filename to download the file to the module as
+    PortFile=n         Path and filename to a port configuration file (optional if Port=n is used)
+    Port=n             Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device]
+    Verbose=n          Output verbosity: 0 = none, 1 = normal, 2 = extra
+    Verify=n           File verification: 0 = none, 1 = checks file exists on module after download
+    XCompDir=n         Specifies the directory to XCompilers (Windows only)
+
+(Please note that baud rate and flow control configuration must be on the command line before any port arguments)
+
+INI format for a PortFile:
+[General]
+Port1=COM2
+Port2=COM18
+...
+Port5=COM130
+
+
+A quick command that will XCompile and download an application to two devices: 
+MultiDeviceLoader.exe RunOnExit=1 EraseFS=1 XCompile=1 Baud=9600 DownloadFile=D:\sample.sb RenameFile=$autorun$ Port=COM110 Port=COM100 Verbose=1 XCompDir=C:/XComps/
