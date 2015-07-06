@@ -31,8 +31,8 @@
  * Baud=n             Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900)
  * DownloadFile=n     Path and filename to XCompile/download
  * RenameFile=n       Filename to download the file to the module as
- * PortFile=n         Path and filename to a port configuration file (optional if Port=n is used)
- * Port=n             Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device]
+ * PortFile=n         Path and filename to a port configuration file (not needed if Port=n is used)
+ * Port=n             Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device] (not needed if PortFile=n is used)
  * Verbose=n          Output verbosity: 0 = none, 1 = normal, 2 = extra
  * Verify=n           File verification: 0 = none, 1 = checks file exists on module after download
  * XCompDir=n         Specifies the directory to XCompilers (Windows only)
