@@ -75,15 +75,13 @@ QSerialPort SerialHandles[MaxPorts]; //Handle of Serial handle objects
 // Class definitions
 /******************************************************************************/
 int
-main
-    (
+main(
     int argc,
     char *argv[]
     );
 
 void
-ClosePorts
-    (
+ClosePorts(
     unsigned char ucNumPorts
     );
 
