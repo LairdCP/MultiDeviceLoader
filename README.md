@@ -4,7 +4,7 @@
 
 MultiDeviceLoader is a command-line application for Windows and Linux that can be used to XCompile an application (Windows only) and download it to multiple Laird devices at the same time and provides options for renaming the file, running it after downloading it and other functions.
 
-This is a companion application for [UwTerminalX](https://github.com/LairdCP/UwTerminalX).
+This is a companion application for [UwTerminalX](https://github.com/LairdCP/UwTerminalX) and is mostly suited to production/end-stage testing purposes.
 
 ##Downloading
 
