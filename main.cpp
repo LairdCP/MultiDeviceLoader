@@ -373,7 +373,7 @@ main(
         }
 
         //Construct XCompiler filename
-        QString XCompFilename = QString(strXCompilerDirectory).append("XComp_").append(match1.captured(1).mid(0, 8)).append("_").append(match2.captured(1)).append("_").append(match2.captured(2))
+        QString XCompFilename = QString(strXCompilerDirectory).append("XComp_").append(AtiToXCompName(match1.captured(1))).append("_").append(match2.captured(1)).append("_").append(match2.captured(2))
 #ifdef _WIN32
                 //Include .exe for windows hosts
                 .append(".exe")
@@ -648,6 +648,36 @@ ClosePorts(
         }
         --ucNumPorts;
     }
+}
+
+//=============================================================================
+//=============================================================================
+QString
+AtiToXCompName(
+    QString strAtiResp
+    )
+{
+    //Function to extract XCompiler name from ATI response
+    if (strAtiResp.length() > MaxDevNameSize)
+    {
+        //Shorten device name
+        strAtiResp = strAtiResp.left(MaxDevNameSize);
+    }
+
+    //Only allow a-z, A-Z, 0-9 and underscores in device name
+    int iI = 0;
+    while (iI < strAtiResp.length())
+    {
+        //Check each character
+        char cTmpC = strAtiResp.at(iI).toLatin1();
+        if (!(cTmpC > 47 && cTmpC < 58) && !(cTmpC > 64 && cTmpC < 91) && !(cTmpC > 96 && cTmpC < 123) && cTmpC != 95)
+        {
+            //Replace non-alphanumeric character with an underscore
+            strAtiResp[iI] = '_';
+        }
+        ++iI;
+    }
+    return strAtiResp;
 }
 
 /******************************************************************************/
