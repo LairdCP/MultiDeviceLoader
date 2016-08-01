@@ -98,7 +98,7 @@ main(
 #ifdef _WIN32
         else if (slArgs[chi].left(9) == "XCompile=")
         {
-            //XCompile application configuration (Only for windows)
+            //XCompile application configuration (Only for Windows)
             bXCompileApplication = (slArgs[chi].right(1) == "0" ? false : true);
         }
 #endif
@@ -175,7 +175,7 @@ main(
                         else
                         {
                             //Failed to open
-                            qDebug() << "Failed to open port: " << CPort;
+                            qDebug() << "Failed to open port:" << CPort;
                             if (bAllowPortFail == false)
                             {
                                 //Exit application
@@ -215,7 +215,7 @@ main(
             else
             {
                 //Failed to open
-                qDebug() << "Failed to open port: " << slArgs[chi].mid(5, -1);
+                qDebug() << "Failed to open port:" << slArgs[chi].mid(5, -1);
                 if (bAllowPortFail == false)
                 {
                     //Exit application
@@ -250,6 +250,13 @@ main(
             bVerifyCheck = (slArgs[chi].right(1) == "0" ? false : true);
         }
         ++chi;
+    }
+
+    if (chi == 1)
+    {
+        //No parameters passed
+        qDebug() << "No parameters passed to executable, exiting.\r\nQuick help:\r\n  RunOnExit=n      1 = run application, 0 = do not run application\r\n  EraseFS=n        1 = erase file-system, 0 = do not erase file-system\r\n  XCompile=n       1 = XCompile source code (Windows only), 0 = download file as-is\r\n  FlowControl=n    Flow control: 1 = Hardware (default), 2 = Software, 0 = NA\r\n  Baud=n           Baud rate (300-921600, Mac only supports up to 230400)\r\n  DownloadFile=n   Path and filename to XCompile/download\r\n  RenameFile=n     Filename to download the file to the module as\r\n  PortFile=n       Path/filename to a port configuration file\r\n  Port=n           Specify a port to use (specify multiple times for additional ports), Windows: COM[1-255], Mac/Linux: /dev/[device]\r\n  Verbose=n        Output verbosity: 0 = none, 1 = normal, 2 = extra\r\n  Verify=n         1 = checks file exists on module, 0 = none\r\n  XCompDir=n       Specifies the directory to XCompilers (Windows only)\r\n  AllowPortFail=n  1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)\r\n  FWRHSize=n       Number of bytes to write per line to target devices (default is 72, must be multiple of 2).";
+        return ERROR_CODE_NO_PARAMETERS;
     }
 
     if (strDownloadFilename == "" || QFile::exists(strDownloadFilename) == false)

@@ -50,7 +50,7 @@
 #define PauseRate         100      //Lower = faster but will break slower baud rates. 50 for 9600, 20 for 115200
 #define MaxPorts          10       //Number of maximum ports to allow
 #define MaxFilenameLength 20       //Maximum allowable length of a filename (for the target BL600/BL620/BT900 device)
-#define AppVersion        "v1.02"  //Version string
+#define AppVersion        "v1.03"  //Version string
 #define MaxDevNameSize    8        //Size (in characters) to allow for a module device name (characters past this point will be chopped off)
 
 /******************************************************************************/
@@ -61,17 +61,18 @@ QSerialPort SerialHandles[MaxPorts]; //Handle of Serial handle objects
 /******************************************************************************/
 // Defines for error/success codes
 /******************************************************************************/
-#define SUCCESS_CODE                            0
-#define ERROR_CODE_TOO_MANY_PORTS               1
-#define ERROR_CODE_INVALID_DOWNLOAD_FILENAME    2
-#define ERROR_CODE_INVALID_BAUD_RATE            3
-#define ERROR_CODE_NO_PORTS_PROVIDED            4
-#define ERROR_CODE_XCOMPILE_DETAILS_FAILED      5
-#define ERROR_CODE_INVALID_XCOMPILER            6
-#define ERROR_CODE_XCOMPILE_FAILED              7
-#define ERROR_CODE_XCOMPILE_FILE_INVALID        8
-#define ERROR_CODE_FILE_NOT_DOWNLOADED          9
-#define ERROR_CODE_PORT_OPEN_FAILED             10
+#define SUCCESS_CODE                            0  //Exit code if everything was successful
+#define ERROR_CODE_TOO_MANY_PORTS               1  //Exit code if too many ports have been specified on the command line
+#define ERROR_CODE_INVALID_DOWNLOAD_FILENAME    2  //Exit code if the specified download filename is not valid
+#define ERROR_CODE_INVALID_BAUD_RATE            3  //Exit code if the specified baud rate is not valid
+#define ERROR_CODE_NO_PORTS_PROVIDED            4  //Exit code if no ports have been provided
+#define ERROR_CODE_XCOMPILE_DETAILS_FAILED      5  //Exit code if an error occured getting the XCompiler details from the first module (Windows only)
+#define ERROR_CODE_INVALID_XCOMPILER            6  //Exit code if required XCompiler cannot be found (Windows only)
+#define ERROR_CODE_XCOMPILE_FAILED              7  //Exit code if XCompilation failed (Windows only)
+#define ERROR_CODE_XCOMPILE_FILE_INVALID        8  //Exit code if the file created by the XCompiler does not exist (Windows only)
+#define ERROR_CODE_FILE_NOT_DOWNLOADED          9  //Exit code if the file is missing from one or more of the modules
+#define ERROR_CODE_PORT_OPEN_FAILED             10 //Exit code if a port failed to opened and AllowPortFail is set to 0 or not set
+#define ERROR_CODE_NO_PARAMETERS                11 //Exit code if no parameters was supplied to the program
 
 /******************************************************************************/
 // Class definitions

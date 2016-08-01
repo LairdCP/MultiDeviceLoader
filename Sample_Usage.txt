@@ -8,14 +8,14 @@ Command line parameters:
     DownloadFile=n     Path and filename to XCompile/download
     RenameFile=n       Filename to download the file to the module as
     PortFile=n         Path and filename to a port configuration file (optional if Port=n is used)
-    Port=n             Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device]
+    Port=n             Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Mac/Linux: /dev/[device]
     Verbose=n          Output verbosity: 0 = none, 1 = normal, 2 = extra
     Verify=n           File verification: 0 = none, 1 = checks file exists on module after download
     XCompDir=n         Specifies the directory to XCompilers (Windows only)
     AllowPortFail=n    1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)
     FWRHSize=n         Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).
 
-(Please note that baud rate and flow control configuration must be on the command line before any port arguments)
+(Please note that baud rate, flow control and allow port fail configuration must be on the command line before any port arguments)
 
 INI format for a PortFile:
 [General]
@@ -25,5 +25,8 @@ Port2=COM18
 Port5=COM130
 
 
-A quick command that will XCompile and download an application to two devices: 
+A quick command that will XCompile and download an application to two devices using Windows:
 MultiDeviceLoader.exe RunOnExit=1 EraseFS=1 XCompile=1 Baud=9600 DownloadFile=D:\sample.sb RenameFile=$autorun$ Port=COM110 Port=COM100 Verbose=1 XCompDir=C:/XComps/
+
+A quick command that will download a compiled application or data file to two devices using Mac/Linux:
+./MultiDeviceLoader RunOnExit=1 EraseFS=0 Baud=115200 DownloadFile=/tmp/datafile.uwc Port=/dev/ttyUSB0 Port=/dev/ttyACM0 Verbose=1
