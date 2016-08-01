@@ -2,13 +2,13 @@
 
 ##About
 
-MultiDeviceLoader is a command-line application for Windows and Linux that can be used to XCompile an application (Windows only) and download it to multiple Laird devices at the same time and provides options for renaming the file, running it after downloading it and other functions.
+MultiDeviceLoader is a command-line application for Windows, Linux and Mac that can be used to XCompile an application (Windows only) and download it to multiple Laird devices at the same time and provides options for renaming the file, running it after downloading it and other functions.
 
 This is a companion application for [UwTerminalX](https://github.com/LairdCP/UwTerminalX) and is mostly suited to production/end-stage testing purposes.
 
 ##Downloading
 
-Pre-compiled builds can be found by clicking the [Releases](https://github.com/LairdCP/MultiDeviceLoader/releases) tab on Github, builds are available for Linux (32 bit build) and Windows (32 bit build).
+Pre-compiled builds can be found by clicking the [Releases](https://github.com/LairdCP/MultiDeviceLoader/releases) tab on Github, builds are available for Linux (32 bit build), Windows (32 bit build) and Mac (64 bit build).
 
 ##Setup
 
@@ -24,13 +24,29 @@ Extracting the archive can either be done in the GUI or by using a terminal:
 
 	tar xf MultiDeviceLoader.tar ~/
 
-Executing MultiDeviceLoader can be achieved using
+Executing MultiDeviceLoader can be achieved using:
+
+	./MultiDeviceLoader <command line arguments here>
+
+###Mac
+
+Download the dmg and mount the image, then simply copy the executable to a location of your choosing. The executable must be ran using terminal and may require you to adjust your security preferences to allow it to run.
+
+Change to the directory where MultiDeviceLoader is located:
+
+	cd Downloads/MultiDeviceLoader
+
+Executing MultiDeviceLoader can be achieved using:
 
 	./MultiDeviceLoader <command line arguments here>
 
 ##Compiling
 
 Compiling MultiDeviceLoader is a similar process to compiling UwTerminalX, please refer to the [UwTerminalX compilation wiki page](https://github.com/LairdCP/UwTerminalX/wiki/Compiling), replacing the UwTerminalX source code tree with the MultiDeviceLoader source code tree.
+
+##Usage
+
+For a list of parameters that can be supplied and to see an example of using the application please refer to the [Sample_Usage.txt file](https://github.com/LairdCP/MultiDeviceLoader/blob/master/Sample_Usage.txt)
 
 ##License
 

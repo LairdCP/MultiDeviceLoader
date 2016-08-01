@@ -1,5 +1,5 @@
 /******************************************************************************
-** Copyright (C) 2015 Laird
+** Copyright (C) 2015-2016 Laird
 **
 ** Project: MultiDeviceLoader
 **
@@ -46,12 +46,12 @@
 /******************************************************************************/
 // Defines
 /******************************************************************************/
-#define FWRHSize 72 //Number of hex characters to send per FWRH line
-#define PauseRate 100 //Lower = faster but will break slower baud rates. 50 for 9600, 20 for 115200
-#define MaxPorts 10 //Number of maximum ports to allow
-#define MaxFilenameLength 20 //Maximum allowable length of a filename (for the target BL600/BL620/BT900 device)
-#define AppVersion "v1.01" //Version string
-#define MaxDevNameSize 8 //Size (in characters) to allow for a module device name (characters past this point will be chopped off)
+#define DefaultFWRHSize   72       //Number of hex characters to send per FWRH line
+#define PauseRate         100      //Lower = faster but will break slower baud rates. 50 for 9600, 20 for 115200
+#define MaxPorts          10       //Number of maximum ports to allow
+#define MaxFilenameLength 20       //Maximum allowable length of a filename (for the target BL600/BL620/BT900 device)
+#define AppVersion        "v1.02"  //Version string
+#define MaxDevNameSize    8        //Size (in characters) to allow for a module device name (characters past this point will be chopped off)
 
 /******************************************************************************/
 // Global/Static Variable Declarations
@@ -59,7 +59,7 @@
 QSerialPort SerialHandles[MaxPorts]; //Handle of Serial handle objects
 
 /******************************************************************************/
-// Defines
+// Defines for error/success codes
 /******************************************************************************/
 #define SUCCESS_CODE                            0
 #define ERROR_CODE_TOO_MANY_PORTS               1
@@ -71,6 +71,7 @@ QSerialPort SerialHandles[MaxPorts]; //Handle of Serial handle objects
 #define ERROR_CODE_XCOMPILE_FAILED              7
 #define ERROR_CODE_XCOMPILE_FILE_INVALID        8
 #define ERROR_CODE_FILE_NOT_DOWNLOADED          9
+#define ERROR_CODE_PORT_OPEN_FAILED             10
 
 /******************************************************************************/
 // Class definitions

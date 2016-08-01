@@ -3,7 +3,7 @@ Command line parameters:
     RunOnExit=n        1 = run application when downloaded, 0 = do not run application when downloaded
     EraseFS=n          1 = erase file-system, 0 = do not erase file-system
     XCompile=n         1 = XCompile source and download application (Windows only), 0 = download application as-is
-    FlowControl=n      1 = Hardware flow control, 2 = Software flow control, 0 = No flow control
+    FlowControl=n      1 = Hardware flow control (default), 2 = Software flow control, 0 = No flow control
     Baud=n             Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900)
     DownloadFile=n     Path and filename to XCompile/download
     RenameFile=n       Filename to download the file to the module as
@@ -12,6 +12,8 @@ Command line parameters:
     Verbose=n          Output verbosity: 0 = none, 1 = normal, 2 = extra
     Verify=n           File verification: 0 = none, 1 = checks file exists on module after download
     XCompDir=n         Specifies the directory to XCompilers (Windows only)
+    AllowPortFail=n    1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)
+    FWRHSize=n         Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).
 
 (Please note that baud rate and flow control configuration must be on the command line before any port arguments)
 

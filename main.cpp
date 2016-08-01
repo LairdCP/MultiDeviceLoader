@@ -1,5 +1,5 @@
 /******************************************************************************
-** Copyright (C) 2015 Laird
+** Copyright (C) 2015-2016 Laird
 **
 ** Project: MultiDeviceLoader
 **
@@ -36,6 +36,8 @@
  * Verbose=n          Output verbosity: 0 = none, 1 = normal, 2 = extra
  * Verify=n           File verification: 0 = none, 1 = checks file exists on module after download
  * XCompDir=n         Specifies the directory to XCompilers (Windows only)
+ * AllowPortFail=n    1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)
+ * FWRHSize=n         Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).
  */
 
 /******************************************************************************/
@@ -61,9 +63,9 @@ main(
     bool bEraseFS = false; //True if filesystem is to be erased.
     QString strRenameFilename(""); //Filename to store on the target device
     bool bRunOnExit = false; //True if application should be executed after download
-    bool bXCompileApplication = false; //True if the application is to be XCompiled before hand
+    bool bXCompileApplication = false; //True if the application is to be XCompiled before downloading
     unsigned char ucExtraVerbose = 0; //1 or 2 to output additional verbose messages
-    qint8 intFlowControl = QSerialPort::HardwareControl; //Flow control, 0 = none, 1 = software, 2 = hardware
+    qint8 intFlowControl = QSerialPort::HardwareControl; //Flow control, 0 = none, 1 = hardware (default), 2 = software
     QString strXCompilerDirectory(""); //Directory containing the XCompilers
     unsigned char ucCPortNum = 1; //Current port number
     unsigned char ucNumPorts = 0; //Total number of ports used
@@ -72,6 +74,8 @@ main(
     QRegularExpression rxExp2("10\t13\t(.+?) (.+?) \r"); //ATI 13 match
     QRegularExpression rxExp3("01\t([0-9A-F]{4})\r"); //Error running match
     QByteArray baHexData; //Hex data of UWC file
+    bool bAllowPortFail = false; //True if a port fails to open then continue without quitting the application
+    int intFWRHSize = DefaultFWRHSize; //Number of characters to send per line to each module
 
     //Output version
     qDebug() << "Laird MultiDeviceLoader" << AppVersion << "built" << __DATE__;
@@ -84,45 +88,20 @@ main(
         if (slArgs[chi].left(10) == "RunOnExit=")
         {
             //Run on exit configuration
-            if (slArgs[chi].right(1) == "0")
-            {
-                //Disable
-                bRunOnExit = false;
-            }
-            else
-            {
-                //Enable
-                bRunOnExit = true;
-            }
+            bRunOnExit = (slArgs[chi].right(1) == "0" ? false : true);
         }
         else if (slArgs[chi].left(8) == "EraseFS=")
         {
             //Erase filesystem configuration
-            if (slArgs[chi].right(1) == "0")
-            {
-                //Disable
-                bEraseFS = false;
-            }
-            else
-            {
-                //Enable
-                bEraseFS = true;
-            }
+            bEraseFS = (slArgs[chi].right(1) == "0" ? false : true);
         }
+#ifdef _WIN32
         else if (slArgs[chi].left(9) == "XCompile=")
         {
-            //XCompile application configuration
-            if (slArgs[chi].right(1) == "0")
-            {
-                //Disable
-                bXCompileApplication = false;
-            }
-            else
-            {
-                //Enable
-                bXCompileApplication = true;
-            }
+            //XCompile application configuration (Only for windows)
+            bXCompileApplication = (slArgs[chi].right(1) == "0" ? false : true);
         }
+#endif
         else if (slArgs[chi].left(12) == "FlowControl=")
         {
             //Flow control configuration
@@ -157,6 +136,16 @@ main(
             //Rename filename
             strRenameFilename = slArgs[chi].mid(11, -1);
         }
+        else if (slArgs[chi].left(14) == "AllowPortFail=")
+        {
+            //Set allowing port opening to fail or not
+            bAllowPortFail = (slArgs[chi].mid(14, 1).toInt() == 0 ? false : true);
+        }
+        else if (slArgs[chi].left(9) == "FWRHSize=")
+        {
+            //Set the maximum line length
+            intFWRHSize = slArgs[chi].mid(9, -1).toInt();
+        }
         else if (slArgs[chi].left(9) == "PortFile=")
         {
             //Load ports from INI file
@@ -182,6 +171,18 @@ main(
                         {
                             //Open success
                             ++ucNumPorts;
+                        }
+                        else
+                        {
+                            //Failed to open
+                            qDebug() << "Failed to open port: " << CPort;
+                            if (bAllowPortFail == false)
+                            {
+                                //Exit application
+                                qDebug() << "AllowPortFail set to false, exiting.";
+                                ClosePorts(ucNumPorts);
+                                return ERROR_CODE_PORT_OPEN_FAILED;
+                            }
                         }
                     }
                     ++ucCPortNum;
@@ -211,6 +212,18 @@ main(
                 //Open success
                 ++ucNumPorts;
             }
+            else
+            {
+                //Failed to open
+                qDebug() << "Failed to open port: " << slArgs[chi].mid(5, -1);
+                if (bAllowPortFail == false)
+                {
+                    //Exit application
+                    qDebug() << "AllowPortFail set to false, exiting.";
+                    ClosePorts(ucNumPorts);
+                    return ERROR_CODE_PORT_OPEN_FAILED;
+                }
+            }
         }
         else if (slArgs[chi].left(8) == "Verbose=")
         {
@@ -234,16 +247,7 @@ main(
         else if (slArgs[chi].left(7) == "Verify=")
         {
             //Verify mode configuration
-            if (slArgs[chi].right(1) == "0")
-            {
-                //Disable
-                bVerifyCheck = false;
-            }
-            else
-            {
-                //Enable
-                bVerifyCheck = true;
-            }
+            bVerifyCheck = (slArgs[chi].right(1) == "0" ? false : true);
         }
         ++chi;
     }
@@ -501,7 +505,7 @@ main(
     while (Sent < Size)
     {
         //Send this block
-        QByteArray TmpBA = QString("AT+FWRH \"").append(baHexData.mid(Sent, FWRHSize)).append("\"\r").toUtf8();
+        QByteArray TmpBA = QString("AT+FWRH \"").append(baHexData.mid(Sent, intFWRHSize)).append("\"\r").toUtf8();
         ucCPortNum = 0;
         while (ucCPortNum < ucNumPorts)
         {
@@ -516,7 +520,7 @@ main(
             SerialHandles[ucCPortNum].readAll();
             ++ucCPortNum;
         }
-        Sent += FWRHSize;
+        Sent += intFWRHSize;
         if (ucExtraVerbose > 1)
         {
             //Additional verbose debugging
