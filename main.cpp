@@ -38,6 +38,8 @@
  * XCompDir=n         Specifies the directory to XCompilers (Windows only)
  * AllowPortFail=n    1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)
  * FWRHSize=n         Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).
+ * OpenMode=n         0 = open files normally (will fail if file already exists), 1 = delete file before opening
+ * DownloadCheck=n    0 = do not check download progress, 1 = check for error responses when downloading files
  */
 
 /******************************************************************************/
@@ -69,13 +71,16 @@ main(
     QString strXCompilerDirectory(""); //Directory containing the XCompilers
     unsigned char ucCPortNum = 1; //Current port number
     unsigned char ucNumPorts = 0; //Total number of ports used
-    bool bVerifyCheck = 1; //Verifies files were downloaded (using at+dir)
+    unsigned char ucVerifyCheck = 1; //File verification: (0 = none, 1 = using at+dir, 2 = checksum, 3 = at+dir and checksum)
     QRegularExpression rxExp1("10\t0\t(.+?)\r"); //ATI 0 match
     QRegularExpression rxExp2("10\t13\t(.+?) (.+?) \r"); //ATI 13 match
     QRegularExpression rxExp3("01\t([0-9A-F]{4})\r"); //Error running match
     QByteArray baHexData; //Hex data of UWC file
     bool bAllowPortFail = false; //True if a port fails to open then continue without quitting the application
     int intFWRHSize = DefaultFWRHSize; //Number of characters to send per line to each module
+    QString strChecksum; //Checksum of file (hex)
+    bool bOpenmode = false; //When false will open file normally (fails if file exists), when true will delete file before opening
+    bool bDownloadCheck = false; //When true will check for errors during file download
 
     //Output version
     qDebug() << "Laird MultiDeviceLoader" << AppVersion << "built" << __DATE__;
@@ -247,11 +252,39 @@ main(
         else if (slArgs[chi].left(7) == "Verify=")
         {
             //Verify mode configuration
-            bVerifyCheck = (slArgs[chi].right(1) == "0" ? false : true);
+            if (slArgs[chi].right(1) == "0")
+            {
+                //No verification
+                ucVerifyCheck = 0;
+            }
+            else if (slArgs[chi].right(1) == "1")
+            {
+                //Use at+dir
+                ucVerifyCheck = 1;
+            }
+            else if (slArgs[chi].right(1) == "2")
+            {
+                //Checksum
+                ucVerifyCheck = 2;
+            }
+            else if (slArgs[chi].right(1) == "3")
+            {
+                //Use at+dir and checksum
+                ucVerifyCheck = 3;
+            }
+        }
+        else if (slArgs[chi].left(9) == "OpenMode=")
+        {
+            //OpenMode configuration
+            bOpenmode = (slArgs[chi].right(1) == "0" ? false : true);
+        }
+        else if (slArgs[chi].left(14) == "DownloadCheck=")
+        {
+            //OpenMode configuration
+            bDownloadCheck = (slArgs[chi].right(1) == "0" ? false : true);
         }
         ++chi;
     }
-
     if (chi == 1)
     {
         //No parameters passed
@@ -487,6 +520,46 @@ main(
         //Add the hex character to the string
         baHexData.append(ThisHex.toUpper());
     }
+
+    //Calculate checksum if needed
+    if ((ucVerifyCheck & 2) == 2)
+    {
+        //Rewind file
+        file.seek(0);
+
+        if (ucExtraVerbose > 0)
+        {
+            qDebug() << "Calculating file checksum...";
+        }
+
+        //Checksum value
+        unsigned short usChecksum = 0xFFFF;
+
+        while (!in.atEnd())
+        {
+            //Calculate checksum byte-by-byte
+            quint8 ThisByte;
+            in >> ThisByte;
+            usChecksum = ByteChecksum(usChecksum, ThisByte);
+        }
+
+        //Convert to hex
+        strChecksum = QString::number(usChecksum, 16).toUpper();
+
+        while (strChecksum.length() < 4)
+        {
+            //Expand to 4 characters
+            strChecksum.insert(0, "0");
+        }
+
+        //Add hex start
+        strChecksum.prepend("0x");
+
+        if (ucExtraVerbose > 0)
+        {
+            qDebug() << "File checksum:" << strChecksum;
+        }
+    }
     file.close();
 
     //Open files on devices
@@ -497,8 +570,47 @@ main(
     ucCPortNum = 0;
     while (ucCPortNum < ucNumPorts)
     {
+        if (bOpenmode == true)
+        {
+            //Delete files
+            SerialHandles[ucCPortNum].write(QString("AT+DEL \"").append(strRenameFilename).append("\" +\r").toUtf8());
+            while (SerialHandles[ucCPortNum].waitForReadyRead(250));
+        }
         SerialHandles[ucCPortNum].write(QString("AT+FOW \"").append(strRenameFilename).append("\"\r").toUtf8());
         while (SerialHandles[ucCPortNum].waitForReadyRead(250));
+        ++ucCPortNum;
+    }
+    ucCPortNum = 0;
+    while (ucCPortNum < ucNumPorts)
+    {
+        if (bDownloadCheck == true)
+        {
+            //Check response
+            QByteArray TmpBA = SerialHandles[ucCPortNum].readAll();
+            if (TmpBA.indexOf("\n00\r") == -1)
+            {
+                //Error
+                int iRemove = TmpBA.indexOf("\n01\t");
+                if (iRemove == -1)
+                {
+                    //Response not valid
+                    qDebug() << "Error whilst opening file, unknown response:" << TmpBA << "from device #" << (ucCPortNum+1);
+                    ClosePorts(ucNumPorts);
+                    return ERROR_CODE_DOWNLOAD_FAIL;
+                }
+                iRemove += 4;
+                TmpBA = TmpBA.mid(iRemove, 4);
+                TmpBA.prepend("0x");
+                qDebug() << "Error response during file opening:" << TmpBA << "from device #" << (ucCPortNum+1);
+                ClosePorts(ucNumPorts);
+                return ERROR_CODE_DOWNLOAD_ERROR;
+            }
+        }
+        else
+        {
+            //Do not check response
+            SerialHandles[ucCPortNum].readAll();
+        }
         ++ucCPortNum;
     }
 
@@ -524,7 +636,40 @@ main(
         {
             SerialHandles[ucCPortNum].waitForBytesWritten(-1);
             while (SerialHandles[ucCPortNum].waitForReadyRead(PauseRate) == false);
-            SerialHandles[ucCPortNum].readAll();
+            ++ucCPortNum;
+        }
+
+        ucCPortNum = 0;
+        while (ucCPortNum < ucNumPorts)
+        {
+            if (bDownloadCheck == true)
+            {
+                //Check response
+                TmpBA = SerialHandles[ucCPortNum].readAll();
+                if (TmpBA.indexOf("\n00\r") == -1)
+                {
+                    //Error
+                    int iRemove = TmpBA.indexOf("\n01\t");
+                    if (iRemove == -1)
+                    {
+                        //Response not valid
+                        qDebug() << "Error whilst downloading, unknown response:" << TmpBA << "from device #" << (ucCPortNum+1);
+                        ClosePorts(ucNumPorts);
+                        return ERROR_CODE_DOWNLOAD_FAIL;
+                    }
+                    iRemove += 4;
+                    TmpBA = TmpBA.mid(iRemove, 4);
+                    TmpBA.prepend("0x");
+                    qDebug() << "Error response during download:" << TmpBA << "from device #" << (ucCPortNum+1);
+                    ClosePorts(ucNumPorts);
+                    return ERROR_CODE_DOWNLOAD_ERROR;
+                }
+            }
+            else
+            {
+                //Do not check response
+                SerialHandles[ucCPortNum].readAll();
+            }
             ++ucCPortNum;
         }
         Sent += intFWRHSize;
@@ -547,31 +692,102 @@ main(
         while (SerialHandles[ucCPortNum].waitForReadyRead(250));
         ++ucCPortNum;
     }
+    ucCPortNum = 0;
+    while (ucCPortNum < ucNumPorts)
+    {
+        if (bDownloadCheck == true)
+        {
+            //Check response
+            QByteArray TmpBA = SerialHandles[ucCPortNum].readAll();
+            if (TmpBA.indexOf("\n00\r") == -1)
+            {
+                //Error
+                int iRemove = TmpBA.indexOf("\n01\t");
+                if (iRemove == -1)
+                {
+                    //Response not valid
+                    qDebug() << "Error whilst closing file handle, unknown response:" << TmpBA << "from device #" << (ucCPortNum+1);
+                    ClosePorts(ucNumPorts);
+                    return ERROR_CODE_FILECLOSE_FAIL;
+                }
+                iRemove += 4;
+                TmpBA = TmpBA.mid(iRemove, 4);
+                TmpBA.prepend("0x");
+                qDebug() << "Error response whilst closing file handle:" << TmpBA << "from device #" << (ucCPortNum+1);
+                ClosePorts(ucNumPorts);
+                return ERROR_CODE_FILECLOSE_ERROR;
+            }
+        }
+        else
+        {
+            //Do not check response
+            SerialHandles[ucCPortNum].readAll();
+        }
+        ++ucCPortNum;
+    }
 
     //File verification check
-    if (bVerifyCheck == true)
+    if (ucVerifyCheck > 0)
     {
-        //Verify that files appear on at+dir listings
-        if (ucExtraVerbose > 0)
+        if ((ucVerifyCheck & 2) == 2)
         {
-            qDebug() << "Checking files were downloaded...";
-        }
-        ucCPortNum = 0;
-        while (ucCPortNum < ucNumPorts)
-        {
-            SerialHandles[ucCPortNum].write(QString("AT+DIR\r").toUtf8());
-            while (SerialHandles[ucCPortNum].waitForReadyRead(1000));
-            QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
-            if (!(RecDat.indexOf(strRenameFilename) > 0))
+            //File checksum
+            if (ucExtraVerbose > 0)
             {
-                //File didn't download
-                qDebug() << "Downloaded file is missing from device #" << (ucCPortNum+1);
-                ClosePorts(ucNumPorts);
-                return ERROR_CODE_FILE_NOT_DOWNLOADED;
+                qDebug() << "Testing module checksums against target:" << strChecksum;
             }
-            ++ucCPortNum;
+
+            ucCPortNum = 0;
+            while (ucCPortNum < ucNumPorts)
+            {
+                SerialHandles[ucCPortNum].write(QString("ATI 0xC12C\r").toUtf8());
+                while (SerialHandles[ucCPortNum].waitForReadyRead(1000));
+                QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
+                int iRemove = RecDat.indexOf("\t49452\t");
+                if (iRemove == -1)
+                {
+                    //Checksum not found
+                    qDebug() << "Module checksum response not valid:" << RecDat << "from device #" << (ucCPortNum+1);
+                    ClosePorts(ucNumPorts);
+                    return ERROR_CODE_CHECKSUM_ERROR;
+                }
+                iRemove += 7;
+                RecDat = RecDat.mid(iRemove, 4);
+                RecDat.prepend("0x");
+                if (RecDat != strChecksum.toUtf8())
+                {
+                    //File checksum mismatch
+                    qDebug() << "Downloaded file checksum does not match:" << RecDat << "from device #" << (ucCPortNum+1);
+                    ClosePorts(ucNumPorts);
+                    return ERROR_CODE_CHECKSUM_FAIL;
+                }
+                ++ucCPortNum;
+            }
         }
 
+        if ((ucVerifyCheck & 1) == 1)
+        {
+            //Verify that files appear on at+dir listings
+            if (ucExtraVerbose > 0)
+            {
+                qDebug() << "Checking files are visible in at+dir listing...";
+            }
+            ucCPortNum = 0;
+            while (ucCPortNum < ucNumPorts)
+            {
+                SerialHandles[ucCPortNum].write(QString("AT+DIR\r").toUtf8());
+                while (SerialHandles[ucCPortNum].waitForReadyRead(1000));
+                QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
+                if (!(RecDat.indexOf(strRenameFilename) > 0))
+                {
+                    //File didn't download
+                    qDebug() << "Downloaded file is missing from device #" << (ucCPortNum+1);
+                    ClosePorts(ucNumPorts);
+                    return ERROR_CODE_FILE_NOT_DOWNLOADED;
+                }
+                ++ucCPortNum;
+            }
+        }
     }
 
     //Wait for all bytes to be written
@@ -689,6 +905,36 @@ AtiToXCompName(
         ++iI;
     }
     return strAtiResp;
+}
+
+//=============================================================================
+//=============================================================================
+unsigned short
+ByteChecksum(
+    unsigned short usCrcVal,
+    unsigned char ucChar
+    )
+{
+    //Calculates checksum of a byte
+    unsigned char i;
+    unsigned short usData;
+
+    for(i=0, usData=(unsigned int)0xff & ucChar++; i < 8; i++, usData >>= 1)
+    {
+        if ((usCrcVal & 0x0001) ^ (usData & 0x0001))
+        {
+            usCrcVal = (usCrcVal >> 1) ^ 0x8408;
+        }
+        else
+        {
+            usCrcVal >>= 1;
+        }
+    }
+    usCrcVal = ~usCrcVal;
+    usData = usCrcVal;
+    usCrcVal = (usCrcVal << 8) | (usData >> 8 & 0xff);
+
+    return usCrcVal;
 }
 
 /******************************************************************************/

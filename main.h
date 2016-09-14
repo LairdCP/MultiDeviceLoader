@@ -50,7 +50,7 @@
 #define PauseRate         100      //Lower = faster but will break slower baud rates. 50 for 9600, 20 for 115200
 #define MaxPorts          10       //Number of maximum ports to allow
 #define MaxFilenameLength 20       //Maximum allowable length of a filename (for the target BL600/BL620/BT900 device)
-#define AppVersion        "v1.03"  //Version string
+#define AppVersion        "v1.04"  //Version string
 #define MaxDevNameSize    8        //Size (in characters) to allow for a module device name (characters past this point will be chopped off)
 
 /******************************************************************************/
@@ -73,6 +73,12 @@ QSerialPort SerialHandles[MaxPorts]; //Handle of Serial handle objects
 #define ERROR_CODE_FILE_NOT_DOWNLOADED          9  //Exit code if the file is missing from one or more of the modules
 #define ERROR_CODE_PORT_OPEN_FAILED             10 //Exit code if a port failed to opened and AllowPortFail is set to 0 or not set
 #define ERROR_CODE_NO_PARAMETERS                11 //Exit code if no parameters was supplied to the program
+#define ERROR_CODE_CHECKSUM_ERROR               12 //Exit code if an unknown response was returned whilst checking the module checksum
+#define ERROR_CODE_CHECKSUM_FAIL                13 //Exit code if module checksum does not match
+#define ERROR_CODE_DOWNLOAD_ERROR               14 //Exit code if an unknown response was returned whilst downloading a file to the module
+#define ERROR_CODE_DOWNLOAD_FAIL                15 //Exit code if an error was returned during a download
+#define ERROR_CODE_FILECLOSE_ERROR              16 //Exit code if an unknown response was returned whilst closing a file handle
+#define ERROR_CODE_FILECLOSE_FAIL               17 //Exit code if an error was returned whilst closing a file handle
 
 /******************************************************************************/
 // Class definitions
@@ -91,6 +97,12 @@ ClosePorts(
 QString
 AtiToXCompName(
     QString strAtiResp
+    );
+
+unsigned short
+ByteChecksum(
+    unsigned short nCrc16,
+    unsigned char pSrcStr
     );
 
 #endif // MAIN_H
