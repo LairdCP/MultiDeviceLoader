@@ -48,6 +48,8 @@ Compiling MultiDeviceLoader is a similar process to compiling UwTerminalX, pleas
 
 For a list of parameters that can be supplied and to see an example of using the application please refer to the [Sample_Usage.txt file](https://github.com/LairdCP/MultiDeviceLoader/blob/master/Sample_Usage.txt)
 
+*Please note:* Checksum verification is not currently supported on the BT900 so using `Verify=2` or `Verify=3` will cause an error that the file verification has failed.
+
 ##License
 
 MultiDeviceLoader is released under the [GPLv3 license](https://github.com/LairdCP/MultiDeviceLoader/blob/master/LICENSE).
