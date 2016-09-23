@@ -34,7 +34,7 @@
  * PortFile=n         Path and filename to a port configuration file (not needed if Port=n is used)
  * Port=n             Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device] (not needed if PortFile=n is used)
  * Verbose=n          Output verbosity: 0 = none, 1 = normal, 2 = extra
- * Verify=n           File verification: 0 = none, 1 = checks file exists on module after download
+ * Verify=n           File verification: 0 = none, 1 = checks file exists on module after download, 2 = check using checksum, 3 = checks file exists on module and checks using checksum
  * XCompDir=n         Specifies the directory to XCompilers (Windows only)
  * AllowPortFail=n    1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)
  * FWRHSize=n         Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).
@@ -90,24 +90,24 @@ main(
     unsigned char chi = 1;
     while (chi < slArgs.length())
     {
-        if (slArgs[chi].left(10) == "RunOnExit=")
+        if (slArgs[chi].left(10).toUpper() == "RUNONEXIT=")
         {
             //Run on exit configuration
             bRunOnExit = (slArgs[chi].right(1) == "0" ? false : true);
         }
-        else if (slArgs[chi].left(8) == "EraseFS=")
+        else if (slArgs[chi].left(8).toUpper() == "ERASEFS=")
         {
             //Erase filesystem configuration
             bEraseFS = (slArgs[chi].right(1) == "0" ? false : true);
         }
 #ifdef _WIN32
-        else if (slArgs[chi].left(9) == "XCompile=")
+        else if (slArgs[chi].left(9).toUpper() == "XCOMPILE=")
         {
             //XCompile application configuration (Only for Windows)
             bXCompileApplication = (slArgs[chi].right(1) == "0" ? false : true);
         }
 #endif
-        else if (slArgs[chi].left(12) == "FlowControl=")
+        else if (slArgs[chi].left(12).toUpper() == "FLOWCONTROL=")
         {
             //Flow control configuration
             if (slArgs[chi].right(1) == "1")
@@ -126,32 +126,32 @@ main(
                 intFlowControl = QSerialPort::NoFlowControl;
             }
         }
-        else if (slArgs[chi].left(5) == "Baud=")
+        else if (slArgs[chi].left(5).toUpper() == "BAUD=")
         {
             //Baud rate configuration
             intBaudRate = slArgs[chi].mid(5, -1).toInt();
         }
-        else if (slArgs[chi].left(13) == "DownloadFile=")
+        else if (slArgs[chi].left(13).toUpper() == "DOWNLOADFILE=")
         {
             //Download/XCompile filename
             strDownloadFilename = slArgs[chi].mid(13, -1);
         }
-        else if (slArgs[chi].left(11) == "RenameFile=")
+        else if (slArgs[chi].left(11).toUpper() == "RENAMEFILE=")
         {
             //Rename filename
             strRenameFilename = slArgs[chi].mid(11, -1);
         }
-        else if (slArgs[chi].left(14) == "AllowPortFail=")
+        else if (slArgs[chi].left(14).toUpper() == "ALLOWPORTFAIL=")
         {
             //Set allowing port opening to fail or not
             bAllowPortFail = (slArgs[chi].mid(14, 1).toInt() == 0 ? false : true);
         }
-        else if (slArgs[chi].left(9) == "FWRHSize=")
+        else if (slArgs[chi].left(9).toUpper() == "FWRHSIZE=")
         {
             //Set the maximum line length
             intFWRHSize = slArgs[chi].mid(9, -1).toInt();
         }
-        else if (slArgs[chi].left(9) == "PortFile=")
+        else if (slArgs[chi].left(9).toUpper() == "PORTFILE=")
         {
             //Load ports from INI file
             if (QFile::exists(slArgs[chi].mid(9, -1)) == true)
@@ -194,9 +194,9 @@ main(
                 }
             }
         }
-        else if (slArgs[chi].left(5) == "Port=")
+        else if (slArgs[chi].left(5).toUpper() == "PORT=")
         {
-            //Port for BL600/BL620/BT900 device
+            //Port for BL600/BL620/BL652/BT900 device
             if (ucNumPorts > MaxPorts)
             {
                 //Too many ports have been opened.
@@ -230,7 +230,7 @@ main(
                 }
             }
         }
-        else if (slArgs[chi].left(8) == "Verbose=")
+        else if (slArgs[chi].left(8).toUpper() == "VERBOSE=")
         {
             //Enable extra verbose debugging
             if (slArgs[chi].right(1) == "1")
@@ -244,12 +244,14 @@ main(
                 ucExtraVerbose = 2;
             }
         }
-        else if (slArgs[chi].left(9) == "XCompDir=")
+#ifdef _WIN32
+        else if (slArgs[chi].left(9).toUpper() == "XCOMPDIR=")
         {
             //Update XCompiler directory
             strXCompilerDirectory = slArgs[chi].mid(9, -1);
         }
-        else if (slArgs[chi].left(7) == "Verify=")
+#endif
+        else if (slArgs[chi].left(7).toUpper() == "VERIFY=")
         {
             //Verify mode configuration
             if (slArgs[chi].right(1) == "0")
@@ -273,14 +275,14 @@ main(
                 ucVerifyCheck = 3;
             }
         }
-        else if (slArgs[chi].left(9) == "OpenMode=")
+        else if (slArgs[chi].left(9).toUpper() == "OPENMODE=")
         {
             //OpenMode configuration
             bOpenmode = (slArgs[chi].right(1) == "0" ? false : true);
         }
-        else if (slArgs[chi].left(14) == "DownloadCheck=")
+        else if (slArgs[chi].left(14).toUpper() == "DOWNLOADCHECK=")
         {
-            //OpenMode configuration
+            //DownloadCheck configuration
             bDownloadCheck = (slArgs[chi].right(1) == "0" ? false : true);
         }
         ++chi;
@@ -288,7 +290,7 @@ main(
     if (chi == 1)
     {
         //No parameters passed
-        qDebug() << "No parameters passed to executable, exiting.\r\nQuick help:\r\n  RunOnExit=n      1 = run application, 0 = do not run application\r\n  EraseFS=n        1 = erase file-system, 0 = do not erase file-system\r\n  XCompile=n       1 = XCompile source code (Windows only), 0 = download file as-is\r\n  FlowControl=n    Flow control: 1 = Hardware (default), 2 = Software, 0 = NA\r\n  Baud=n           Baud rate (300-921600, Mac only supports up to 230400)\r\n  DownloadFile=n   Path and filename to XCompile/download\r\n  RenameFile=n     Filename to download the file to the module as\r\n  PortFile=n       Path/filename to a port configuration file\r\n  Port=n           Specify a port to use (specify multiple times for additional ports), Windows: COM[1-255], Mac/Linux: /dev/[device]\r\n  Verbose=n        Output verbosity: 0 = none, 1 = normal, 2 = extra\r\n  Verify=n         1 = checks file exists on module, 0 = none\r\n  XCompDir=n       Specifies the directory to XCompilers (Windows only)\r\n  AllowPortFail=n  1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)\r\n  FWRHSize=n       Number of bytes to write per line to target devices (default is 72, must be multiple of 2).";
+        qDebug() << "No parameters passed to executable, exiting.\r\nQuick help:\r\n  RunOnExit=n      1 = run application, 0 = do not run application\r\n  EraseFS=n        1 = erase file-system, 0 = do not erase file-system\r\n  XCompile=n       1 = XCompile source code (Windows only), 0 = download file as-is\r\n  FlowControl=n    Flow control: 1 = Hardware (default), 2 = Software, 0 = NA\r\n  Baud=n           Baud rate (300-921600, Mac only supports up to 230400)\r\n  DownloadFile=n   Path and filename to XCompile/download\r\n  RenameFile=n     Filename to download the file to the module as\r\n  PortFile=n       Path/filename to a port configuration file\r\n  Port=n           Specify a port to use (specify multiple times for additional ports), Windows: COM[1-255], Mac/Linux: /dev/[device]\r\n  Verbose=n        Output verbosity: 0 = none, 1 = normal, 2 = extra\r\n  Verify=n           File verification: 0 = none, 1 = checks file exists on module after download, 2 = check using checksum, 3 = checks file exists on module and checks using checksum\r\n  XCompDir=n       Specifies the directory to XCompilers (Windows only)\r\n  AllowPortFail=n  1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)\r\n  FWRHSize=n       Number of bytes to write per line to target devices (default is 72, must be multiple of 2)\r\n  OpenMode=n         0 = open files normally (will fail if file already exists), 1 = delete file before opening\r\n  DownloadCheck=n    0 = do not check download progress, 1 = check for error responses when downloading files\r\n";
         return ERROR_CODE_NO_PARAMETERS;
     }
 
@@ -386,6 +388,7 @@ main(
     usleep(2000000);
 #endif
 
+#ifdef _WIN32
     if (bXCompileApplication == true)
     {
         //XCompile application - get XCompiler details from first device
@@ -417,12 +420,7 @@ main(
         }
 
         //Construct XCompiler filename
-        QString XCompFilename = QString(strXCompilerDirectory).append("XComp_").append(AtiToXCompName(match1.captured(1))).append("_").append(match2.captured(1)).append("_").append(match2.captured(2))
-#ifdef _WIN32
-                //Include .exe for windows hosts
-                .append(".exe")
-#endif
-                ;
+        QString XCompFilename = QString(strXCompilerDirectory).append("XComp_").append(AtiToXCompName(match1.captured(1))).append("_").append(match2.captured(1)).append("_").append(match2.captured(2)).append(".exe");
 
         //Output XCompiler filename
         if (ucExtraVerbose > 0)
@@ -471,6 +469,7 @@ main(
             return ERROR_CODE_XCOMPILE_FILE_INVALID;
         }
     }
+#endif
 
     if (bEraseFS == true)
     {
@@ -877,6 +876,7 @@ ClosePorts(
     }
 }
 
+#ifdef _WIN32
 //=============================================================================
 //=============================================================================
 QString
@@ -906,6 +906,7 @@ AtiToXCompName(
     }
     return strAtiResp;
 }
+#endif
 
 //=============================================================================
 //=============================================================================
