@@ -22,7 +22,7 @@ Download the tar and extract the executable file to a folder of your choice and 
 
 Extracting the archive can either be done in the GUI or by using a terminal:
 
-	tar xf MultiDeviceLoader.tar ~/
+	tar xf MultiDeviceLoader.tar.gz ~/
 
 Executing MultiDeviceLoader can be achieved using:
 
@@ -48,7 +48,7 @@ Compiling MultiDeviceLoader is a similar process to compiling UwTerminalX, pleas
 
 For a list of parameters that can be supplied and to see an example of using the application please refer to the [Sample_Usage.txt file](https://github.com/LairdCP/MultiDeviceLoader/blob/master/Sample_Usage.txt)
 
-*Please note:* Checksum verification is not currently supported on the BT900 so using `Verify=2` or `Verify=3` will cause an error that the file verification has failed.
+*Please note:* Checksum verification on old BT900 firmware is not supported, please ensure you are using firmware version 9.1.12.0 or newer to use the `Verify=2` or `Verify=3` otherwise an error will be shown that the file verification has failed.
 
 ## License
 

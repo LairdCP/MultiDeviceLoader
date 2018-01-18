@@ -1,5 +1,5 @@
 /******************************************************************************
-** Copyright (C) 2015-2016 Laird
+** Copyright (C) 2015-2018 Laird
 **
 ** Project: MultiDeviceLoader
 **
@@ -28,7 +28,7 @@
  * EraseFS=n          1 = erase file-system, 0 = do not erase file-system
  * XCompile=n         1 = XCompile source and download application (Windows only), 0 = download application as-is
  * FlowControl=n      1 = Hardware flow control, 2 = Software flow control, 0 = No flow control
- * Baud=n             Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900)
+ * Baud=n             Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900/BL652/RM1xx)
  * DownloadFile=n     Path and filename to XCompile/download
  * RenameFile=n       Filename to download the file to the module as
  * PortFile=n         Path and filename to a port configuration file (not needed if Port=n is used)

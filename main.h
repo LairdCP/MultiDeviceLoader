@@ -1,5 +1,5 @@
 /******************************************************************************
-** Copyright (C) 2015-2016 Laird
+** Copyright (C) 2015-2018 Laird
 **
 ** Project: MultiDeviceLoader
 **
@@ -48,10 +48,10 @@
 /******************************************************************************/
 #define DefaultFWRHSize   72       //Number of hex characters to send per FWRH line
 #define PauseRate         100      //Lower = faster but will break slower baud rates. 50 for 9600, 20 for 115200
-#define MaxPorts          10       //Number of maximum ports to allow
-#define MaxFilenameLength 20       //Maximum allowable length of a filename (for the target BL600/BL620/BT900 device)
-#define AppVersion        "v1.05"  //Version string
-#define MaxDevNameSize    8        //Size (in characters) to allow for a module device name (characters past this point will be chopped off)
+#define MaxPorts          12       //Number of maximum ports to allow
+#define MaxFilenameLength 20       //Maximum allowable length of a filename (for the target BL600/BL620/BT900/BL652/RM1xx device)
+#define AppVersion        "v1.06"  //Version string
+#define MaxDevNameSize    18       //Size (in characters) to allow for a module device name (characters past this point will be chopped off)
 
 /******************************************************************************/
 // Global/Static Variable Declarations
