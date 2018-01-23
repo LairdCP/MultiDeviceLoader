@@ -81,6 +81,9 @@ main(
     QString strChecksum; //Checksum of file (hex)
     bool bOpenmode = false; //When false will open file normally (fails if file exists), when true will delete file before opening
     bool bDownloadCheck = false; //When true will check for errors during file download
+    QByteArray baTmpBuffer; //Temporary buffer
+    QTimer tmrTimeoutTimer; //Response timeout timer
+    bool bModuleTimeout; //Set to true if a module timeout occurs
 
     //Output version
     qDebug() << "Laird MultiDeviceLoader" << AppVersion << "built" << __DATE__;
@@ -348,6 +351,10 @@ main(
         return ERROR_CODE_NO_PORTS_PROVIDED;
     }
 
+    //Setup timeout timer
+    tmrTimeoutTimer.setInterval(TimeoutTime);
+    tmrTimeoutTimer.setSingleShot(true);
+
     //Enable break on all devices
     if (ucExtraVerbose > 0)
     {
@@ -400,6 +407,33 @@ main(
         SerialHandles[0].write("at i 0\rat i 13\r");
         SerialHandles[0].waitForBytesWritten(-1);
         while (SerialHandles[0].waitForReadyRead(1000));
+
+        //Wait for the module to output the data
+        baTmpBuffer.clear();
+        bModuleTimeout = false;
+        baTmpBuffer = SerialHandles[0].peek(60);
+        while (baTmpBuffer.indexOf("\n00\r") == -1 || baTmpBuffer.indexOf("\n00\r", baTmpBuffer.indexOf("\n00\r")+4) == -1)
+        {
+            //Wait for two line ends
+            if (tmrTimeoutTimer.remainingTime() == 0)
+            {
+                //Module timeout
+                bModuleTimeout = true;
+                break;
+            }
+            SerialHandles[0].waitForReadyRead(20);
+            baTmpBuffer = SerialHandles[0].peek(60);
+        }
+
+        if (bModuleTimeout == true)
+        {
+            //Failed to get a response
+            qDebug() << "Failed to get XCompiler filename from first device.";
+            ClosePorts(ucNumPorts);
+            return ERROR_CODE_XCOMPILE_DETAILS_FAILED;
+        }
+
+        //Read all data in from the port
         QByteArray RecDat = SerialHandles[0].readAll();
 
         //Set regex dot to match everything
@@ -575,6 +609,11 @@ main(
             SerialHandles[ucCPortNum].write(QString("AT+DEL \"").append(strRenameFilename).append("\" +\r").toUtf8());
             while (SerialHandles[ucCPortNum].waitForReadyRead(250));
         }
+
+        //Clear any previos response
+        SerialHandles[ucCPortNum].readAll();
+
+        //Open files for writing
         SerialHandles[ucCPortNum].write(QString("AT+FOW \"").append(strRenameFilename).append("\"\r").toUtf8());
         while (SerialHandles[ucCPortNum].waitForReadyRead(250));
         ++ucCPortNum;
@@ -584,6 +623,23 @@ main(
     {
         if (bDownloadCheck == true)
         {
+            //Wait for the module to respond
+            baTmpBuffer.clear();
+            bModuleTimeout = false;
+            baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+            while (baTmpBuffer.indexOf("\n00\r") == -1)
+            {
+                //Wait for two line ends
+                if (tmrTimeoutTimer.remainingTime() == 0)
+                {
+                    //Module timeout
+                    bModuleTimeout = true;
+                    break;
+                }
+                SerialHandles[ucCPortNum].waitForReadyRead(20);
+                baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+            }
+
             //Check response
             QByteArray TmpBA = SerialHandles[ucCPortNum].readAll();
             if (TmpBA.indexOf("\n00\r") == -1)
@@ -643,6 +699,23 @@ main(
         {
             if (bDownloadCheck == true)
             {
+                //Wait for the module to respond
+                baTmpBuffer.clear();
+                bModuleTimeout = false;
+                baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+                while (baTmpBuffer.indexOf("\n00\r") == -1)
+                {
+                    //Wait for two line ends
+                    if (tmrTimeoutTimer.remainingTime() == 0)
+                    {
+                        //Module timeout
+                        bModuleTimeout = true;
+                        break;
+                    }
+                    SerialHandles[ucCPortNum].waitForReadyRead(20);
+                    baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+                }
+
                 //Check response
                 TmpBA = SerialHandles[ucCPortNum].readAll();
                 if (TmpBA.indexOf("\n00\r") == -1)
@@ -696,6 +769,23 @@ main(
     {
         if (bDownloadCheck == true)
         {
+            //Wait for the module to respond
+            baTmpBuffer.clear();
+            bModuleTimeout = false;
+            baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+            while (baTmpBuffer.indexOf("\n00\r") == -1)
+            {
+                //Wait for two line ends
+                if (tmrTimeoutTimer.remainingTime() == 0)
+                {
+                    //Module timeout
+                    bModuleTimeout = true;
+                    break;
+                }
+                SerialHandles[ucCPortNum].waitForReadyRead(20);
+                baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+            }
+
             //Check response
             QByteArray TmpBA = SerialHandles[ucCPortNum].readAll();
             if (TmpBA.indexOf("\n00\r") == -1)
@@ -740,7 +830,26 @@ main(
             while (ucCPortNum < ucNumPorts)
             {
                 SerialHandles[ucCPortNum].write(QString("ATI 0xC12C\r").toUtf8());
-                while (SerialHandles[ucCPortNum].waitForReadyRead(1000));
+                while (SerialHandles[ucCPortNum].waitForReadyRead(200));
+
+                //Wait for the module to respond
+                baTmpBuffer.clear();
+                bModuleTimeout = false;
+                baTmpBuffer = SerialHandles[ucCPortNum].peek(30);
+                while (baTmpBuffer.indexOf("\n00\r") == -1)
+                {
+                    //Wait for two line ends
+                    if (tmrTimeoutTimer.remainingTime() == 0)
+                    {
+                        //Module timeout
+                        bModuleTimeout = true;
+                        break;
+                    }
+                    SerialHandles[ucCPortNum].waitForReadyRead(20);
+                    baTmpBuffer = SerialHandles[ucCPortNum].peek(30);
+                }
+
+                //Check module response
                 QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
                 int iRemove = RecDat.indexOf("\t49452\t");
                 if (iRemove == -1)
@@ -775,7 +884,26 @@ main(
             while (ucCPortNum < ucNumPorts)
             {
                 SerialHandles[ucCPortNum].write(QString("AT+DIR\r").toUtf8());
-                while (SerialHandles[ucCPortNum].waitForReadyRead(1000));
+                while (SerialHandles[ucCPortNum].waitForReadyRead(200));
+
+                //Wait for the module to respond
+                baTmpBuffer.clear();
+                bModuleTimeout = false;
+                baTmpBuffer = SerialHandles[ucCPortNum].peek(100);
+                while (baTmpBuffer.indexOf("\n00\r") == -1)
+                {
+                    //Wait for two line ends
+                    if (tmrTimeoutTimer.remainingTime() == 0)
+                    {
+                        //Module timeout
+                        bModuleTimeout = true;
+                        break;
+                    }
+                    SerialHandles[ucCPortNum].waitForReadyRead(20);
+                    baTmpBuffer = SerialHandles[ucCPortNum].peek(100);
+                }
+
+                //Check module response
                 QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
                 if (!(RecDat.indexOf(strRenameFilename) > 0))
                 {
@@ -810,6 +938,20 @@ main(
         {
             SerialHandles[ucCPortNum].write(QString("at+run \"").append(strRenameFilename).append("\"\r").toUtf8());
             while (SerialHandles[ucCPortNum].waitForReadyRead(500));
+            ++ucCPortNum;
+        }
+
+        //Short wait for devices to recover
+#ifdef _WIN32
+        Sleep(150);
+#else
+        usleep(150000);
+#endif
+
+        //Check responses (if any)
+        ucCPortNum = 0;
+        while (ucCPortNum < ucNumPorts)
+        {
             QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
             QRegularExpressionMatch match3 = rxExp3.match(RecDat);
             if (match3.hasMatch())

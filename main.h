@@ -35,6 +35,7 @@
 #include <QRegularExpression>
 #include <QProcess>
 #include <QDataStream>
+#include <QTimer>
 #ifdef _WIN32
 //Windows include for Sleep()
 #include <windows.h>
@@ -50,8 +51,9 @@
 #define PauseRate         100      //Lower = faster but will break slower baud rates. 50 for 9600, 20 for 115200
 #define MaxPorts          12       //Number of maximum ports to allow
 #define MaxFilenameLength 20       //Maximum allowable length of a filename (for the target BL600/BL620/BT900/BL652/RM1xx device)
-#define AppVersion        "v1.06"  //Version string
+#define AppVersion        "v1.07"  //Version string
 #define MaxDevNameSize    18       //Size (in characters) to allow for a module device name (characters past this point will be chopped off)
+#define TimeoutTime       350      //Time (in ms) before a module is classed as timed out
 
 /******************************************************************************/
 // Global/Static Variable Declarations
