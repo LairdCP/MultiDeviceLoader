@@ -24,22 +24,23 @@
 /*
  * Command line parameters:
  *
- * RunOnExit=n        1 = run application when downloaded, 0 = do not run application when downloaded
- * EraseFS=n          1 = erase file-system, 0 = do not erase file-system
+ * RunOnExit=n        1 = run application when downloaded, 0 = do not run application when downloaded (default)
+ * EraseFS=n          1 = erase file-system, 0 = do not erase file-system (default)
  * XCompile=n         1 = XCompile source and download application (Windows only), 0 = download application as-is
- * FlowControl=n      1 = Hardware flow control, 2 = Software flow control, 0 = No flow control
+ * FlowControl=n      1 = Hardware flow control (default), 2 = Software flow control, 0 = No flow control
  * Baud=n             Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900/BL652/RM1xx)
  * DownloadFile=n     Path and filename to XCompile/download
  * RenameFile=n       Filename to download the file to the module as
  * PortFile=n         Path and filename to a port configuration file (not needed if Port=n is used)
  * Port=n             Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device] (not needed if PortFile=n is used)
- * Verbose=n          Output verbosity: 0 = none, 1 = normal, 2 = extra
- * Verify=n           File verification: 0 = none, 1 = checks file exists on module after download, 2 = check using checksum, 3 = checks file exists on module and checks using checksum
+ * Verbose=n          Output verbosity: 0 = none (default), 1 = normal, 2 = extra, 3 = extra and tx data
+ * Verify=n           File verification: 0 = none, 1 = checks file exists on module after download (default), 2 = check using checksum, 3 = checks file exists on module and checks using checksum
  * XCompDir=n         Specifies the directory to XCompilers (Windows only)
  * AllowPortFail=n    1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)
  * FWRHSize=n         Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).
- * OpenMode=n         0 = open files normally (will fail if file already exists), 1 = delete file before opening
- * DownloadCheck=n    0 = do not check download progress, 1 = check for error responses when downloading files
+ * OpenMode=n         0 = open files normally (will fail if file already exists, default), 1 = delete file before opening
+ * DownloadCheck=n    0 = do not check download progress, 1 = check for error responses when downloading files (default)
+ * SkipStartBreak=n   0 = send a BREAK at startup to modules to reset them (default), 1 = do not send a BREAK at startup to modules
  */
 
 /******************************************************************************/
@@ -66,7 +67,7 @@ main(
     QString strRenameFilename(""); //Filename to store on the target device
     bool bRunOnExit = false; //True if application should be executed after download
     bool bXCompileApplication = false; //True if the application is to be XCompiled before downloading
-    unsigned char ucExtraVerbose = 0; //1 or 2 to output additional verbose messages
+    unsigned char ucExtraVerbose = 0; //1-3 to output additional verbose messages
     qint8 intFlowControl = QSerialPort::HardwareControl; //Flow control, 0 = none, 1 = hardware (default), 2 = software
     QString strXCompilerDirectory(""); //Directory containing the XCompilers
     unsigned char ucCPortNum = 1; //Current port number
@@ -80,13 +81,14 @@ main(
     int intFWRHSize = DefaultFWRHSize; //Number of characters to send per line to each module
     QString strChecksum; //Checksum of file (hex)
     bool bOpenmode = false; //When false will open file normally (fails if file exists), when true will delete file before opening
-    bool bDownloadCheck = false; //When true will check for errors during file download
+    bool bDownloadCheck = true; //When true will check for errors during file download
     QByteArray baTmpBuffer; //Temporary buffer
     QTimer tmrTimeoutTimer; //Response timeout timer
     bool bModuleTimeout; //Set to true if a module timeout occurs
+    bool bSkipStartBreak = false; //True if the initial startup BREAK should be skipped
 
     //Output version
-    qDebug() << "Laird MultiDeviceLoader" << AppVersion << "built" << __DATE__;
+    qDebug().nospace().noquote() << "Laird MultiDeviceLoader " << AppVersion << " built " << __DATE__;
 
     //Go through and parse the command line parameters
     QStringList slArgs = QCoreApplication::arguments();
@@ -183,7 +185,7 @@ main(
                         else
                         {
                             //Failed to open
-                            qDebug() << "Failed to open port:" << CPort;
+                            qDebug().nospace().noquote() << "Failed to open port: " << CPort;
                             if (bAllowPortFail == false)
                             {
                                 //Exit application
@@ -203,7 +205,7 @@ main(
             if (ucNumPorts > MaxPorts)
             {
                 //Too many ports have been opened.
-                qDebug() << "Too many ports have been opened, maximum supported ports: " << MaxPorts;
+                qDebug().nospace().noquote() << "Too many ports have been opened, maximum supported ports: " << MaxPorts;
                 ClosePorts(ucNumPorts);
                 return ERROR_CODE_TOO_MANY_PORTS;
             }
@@ -223,7 +225,7 @@ main(
             else
             {
                 //Failed to open
-                qDebug() << "Failed to open port:" << slArgs[chi].mid(5, -1);
+                qDebug().nospace().noquote() << "Failed to open port: " << slArgs[chi].mid(5, -1);
                 if (bAllowPortFail == false)
                 {
                     //Exit application
@@ -245,6 +247,11 @@ main(
             {
                 //Extra verbose logging
                 ucExtraVerbose = 2;
+            }
+            else if (slArgs[chi].right(1) == "3")
+            {
+                //Extra verbose logging with tx information
+                ucExtraVerbose = 3;
             }
         }
 #ifdef _WIN32
@@ -288,12 +295,17 @@ main(
             //DownloadCheck configuration
             bDownloadCheck = (slArgs[chi].right(1) == "0" ? false : true);
         }
+        else if (slArgs[chi].left(15).toUpper() == "SKIPSTARTBREAK=")
+        {
+            //SkipStartBreak
+            bSkipStartBreak = (slArgs[chi].right(1) == "0" ? false : true);
+        }
         ++chi;
     }
     if (chi == 1)
     {
         //No parameters passed
-        qDebug() << "No parameters passed to executable, exiting.\r\nQuick help:\r\n  RunOnExit=n      1 = run application, 0 = do not run application\r\n  EraseFS=n        1 = erase file-system, 0 = do not erase file-system\r\n  XCompile=n       1 = XCompile source code (Windows only), 0 = download file as-is\r\n  FlowControl=n    Flow control: 1 = Hardware (default), 2 = Software, 0 = NA\r\n  Baud=n           Baud rate (300-921600, Mac only supports up to 230400)\r\n  DownloadFile=n   Path and filename to XCompile/download\r\n  RenameFile=n     Filename to download the file to the module as\r\n  PortFile=n       Path/filename to a port configuration file\r\n  Port=n           Specify a port to use (specify multiple times for additional ports), Windows: COM[1-255], Mac/Linux: /dev/[device]\r\n  Verbose=n        Output verbosity: 0 = none, 1 = normal, 2 = extra\r\n  Verify=n         File verification: 0 = none, 1 = checks file exists on module after download, 2 = check using checksum, 3 = checks file exists on module and checks using checksum\r\n  XCompDir=n       Specifies the directory to XCompilers (Windows only)\r\n  AllowPortFail=n  1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)\r\n  FWRHSize=n       Number of bytes to write per line to target devices (default is 72, must be multiple of 2)\r\n  OpenMode=n       0 = open files normally (will fail if file already exists), 1 = delete file before opening\r\n  DownloadCheck=n  0 = do not check download progress, 1 = check for error responses when downloading files\r\n";
+        qDebug() << "No parameters passed to executable, exiting.\r\nQuick help:\r\n  RunOnExit=n      1 = run application when downloaded, 0 = do not run application when downloaded (default)\r\n  EraseFS=n        1 = erase file-system, 0 = do not erase file-system (default)\r\n  XCompile=n       1 = XCompile source and download application (Windows only), 0 = download application as-is\r\n  FlowControl=n    1 = Hardware flow control (default), 2 = Software flow control, 0 = No flow control\r\n  Baud=n           Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900/BL652/RM1xx)\r\n  DownloadFile=n   Path and filename to XCompile/download\r\n  RenameFile=n     Filename to download the file to the module as\r\n  PortFile=n       Path and filename to a port configuration file (not needed if Port=n is used)\r\n  Port=n           Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device] (not needed if PortFile=n is used)\r\n  Verbose=n        Output verbosity: 0 = none (default), 1 = normal, 2 = extra, 3 = extra and tx data\r\n  Verify=n         File verification: 0 = none, 1 = checks file exists on module after download (default), 2 = check using checksum, 3 = checks file exists on module and checks using checksum\r\n  XCompDir=n       Specifies the directory to XCompilers (Windows only)\r\n  AllowPortFail=n  1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)\r\n  FWRHSize=n       Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).\r\n  OpenMode=n       0 = open files normally (will fail if file already exists, default), 1 = delete file before opening\r\n  DownloadCheck=n  0 = do not check download progress, 1 = check for error responses when downloading files (default)\r\n  SkipStartBreak=n 0 = send a BREAK at startup to modules to reset them (default), 1 = do not send a BREAK at startup to modules\r\n";
         return ERROR_CODE_NO_PARAMETERS;
     }
 
@@ -355,45 +367,48 @@ main(
     tmrTimeoutTimer.setInterval(TimeoutTime);
     tmrTimeoutTimer.setSingleShot(true);
 
-    //Enable break on all devices
-    if (ucExtraVerbose > 0)
+    //Enable break on all devices if configured to do so
+    if (bSkipStartBreak == false)
     {
-        //Debugging information
-        qDebug() << "Applying BREAK to devices...";
-    }
-    ucCPortNum = 0;
-    while (ucCPortNum < ucNumPorts)
-    {
-        SerialHandles[ucCPortNum].setBreakEnabled(true);
-        ++ucCPortNum;
-    }
+        if (ucExtraVerbose > 0)
+        {
+            //Debugging information
+            qDebug() << "Applying BREAK to devices...";
+        }
+        ucCPortNum = 0;
+        while (ucCPortNum < ucNumPorts)
+        {
+            SerialHandles[ucCPortNum].setBreakEnabled(true);
+            ++ucCPortNum;
+        }
 
-    //Short wait
+        //Short wait
 #ifdef _WIN32
-    Sleep(500);
+        Sleep(500);
 #else
-    usleep(500000);
+        usleep(500000);
 #endif
 
-    //Disable break on all devices
-    if (ucExtraVerbose > 0)
-    {
-        //Debugging information
-        qDebug() << "Removing BREAK from devices...";
-    }
-    ucCPortNum = 0;
-    while (ucCPortNum < ucNumPorts)
-    {
-        SerialHandles[ucCPortNum].setBreakEnabled(false);
-        ++ucCPortNum;
-    }
+        //Disable break on all devices
+        if (ucExtraVerbose > 0)
+        {
+            //Debugging information
+            qDebug() << "Removing BREAK from devices...";
+        }
+        ucCPortNum = 0;
+        while (ucCPortNum < ucNumPorts)
+        {
+            SerialHandles[ucCPortNum].setBreakEnabled(false);
+            ++ucCPortNum;
+        }
 
-    //Short wait
+        //Short wait
 #ifdef _WIN32
-    Sleep(2000);
+        Sleep(2000);
 #else
-    usleep(2000000);
+        usleep(2000000);
 #endif
+    }
 
 #ifdef _WIN32
     if (bXCompileApplication == true)
@@ -412,6 +427,7 @@ main(
         baTmpBuffer.clear();
         bModuleTimeout = false;
         baTmpBuffer = SerialHandles[0].peek(60);
+        tmrTimeoutTimer.start();
         while (baTmpBuffer.indexOf("\n00\r") == -1 || baTmpBuffer.indexOf("\n00\r", baTmpBuffer.indexOf("\n00\r")+4) == -1)
         {
             //Wait for two line ends
@@ -424,6 +440,7 @@ main(
             SerialHandles[0].waitForReadyRead(20);
             baTmpBuffer = SerialHandles[0].peek(60);
         }
+        tmrTimeoutTimer.stop();
 
         if (bModuleTimeout == true)
         {
@@ -459,7 +476,7 @@ main(
         //Output XCompiler filename
         if (ucExtraVerbose > 0)
         {
-            qDebug() << "Using XCompiler" << XCompFilename;
+            qDebug().nospace().noquote() << "Using XCompiler " << XCompFilename;
         }
 
         if (!QFile::exists(XCompFilename))
@@ -482,7 +499,7 @@ main(
             else if (ExitCode == -2)
             {
                 //No such program
-                qDebug() << "XCompiler does not exist, " << XCompFilename;
+                qDebug().nospace().noquote() << "XCompiler does not exist: " << XCompFilename;
             }
             else
             {
@@ -498,7 +515,7 @@ main(
         if (!QFile::exists(strDownloadFilename))
         {
             //File doesn't exist - exit
-            qDebug() << "XCompiled application " << strDownloadFilename << " does not exist.";
+            qDebug().nospace().noquote() << "XCompiled application " << strDownloadFilename << " does not exist.";
             ClosePorts(ucNumPorts);
             return ERROR_CODE_XCOMPILE_FILE_INVALID;
         }
@@ -590,7 +607,7 @@ main(
 
         if (ucExtraVerbose > 0)
         {
-            qDebug() << "File checksum:" << strChecksum;
+            qDebug().nospace().noquote() << "File checksum: " << strChecksum;
         }
     }
     file.close();
@@ -627,6 +644,7 @@ main(
             baTmpBuffer.clear();
             bModuleTimeout = false;
             baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+            tmrTimeoutTimer.start();
             while (baTmpBuffer.indexOf("\n00\r") == -1)
             {
                 //Wait for two line ends
@@ -639,6 +657,7 @@ main(
                 SerialHandles[ucCPortNum].waitForReadyRead(20);
                 baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
             }
+            tmrTimeoutTimer.stop();
 
             //Check response
             QByteArray TmpBA = SerialHandles[ucCPortNum].readAll();
@@ -649,14 +668,14 @@ main(
                 if (iRemove == -1)
                 {
                     //Response not valid
-                    qDebug() << "Error whilst opening file, unknown response:" << TmpBA << "from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Error whilst opening file, unknown response: " << TmpBA << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_DOWNLOAD_FAIL;
                 }
                 iRemove += 4;
                 TmpBA = TmpBA.mid(iRemove, 4);
                 TmpBA.prepend("0x");
-                qDebug() << "Error response during file opening:" << TmpBA << "from device #" << (ucCPortNum+1);
+                qDebug().nospace().noquote() << "Error response during file opening: " << TmpBA << " from device #" << (ucCPortNum+1);
                 ClosePorts(ucNumPorts);
                 return ERROR_CODE_DOWNLOAD_ERROR;
             }
@@ -676,6 +695,8 @@ main(
     }
     unsigned int Size = baHexData.size();
     unsigned int Sent = 0;
+    unsigned int PercentStep = Size/10;
+    unsigned int NextPercentStep = PercentStep;
     while (Sent < Size)
     {
         //Send this block
@@ -683,6 +704,7 @@ main(
         ucCPortNum = 0;
         while (ucCPortNum < ucNumPorts)
         {
+            SerialHandles[ucCPortNum].readAll();
             SerialHandles[ucCPortNum].write(TmpBA);
             ++ucCPortNum;
         }
@@ -694,6 +716,12 @@ main(
             ++ucCPortNum;
         }
 
+        if (ucExtraVerbose > 2)
+        {
+            //Additional verbose debugging
+            qDebug().nospace().noquote() << "Tx: " << QString(TmpBA).replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+        }
+
         ucCPortNum = 0;
         while (ucCPortNum < ucNumPorts)
         {
@@ -703,6 +731,7 @@ main(
                 baTmpBuffer.clear();
                 bModuleTimeout = false;
                 baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+                tmrTimeoutTimer.start();
                 while (baTmpBuffer.indexOf("\n00\r") == -1)
                 {
                     //Wait for two line ends
@@ -715,9 +744,15 @@ main(
                     SerialHandles[ucCPortNum].waitForReadyRead(20);
                     baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
                 }
+                tmrTimeoutTimer.stop();
 
                 //Check response
                 TmpBA = SerialHandles[ucCPortNum].readAll();
+                if (ucExtraVerbose > 1)
+                {
+                    //Additional verbose debugging
+                    qDebug().nospace().noquote() << "Module #" << (ucCPortNum+1) << " Rx: " << QString(TmpBA).replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+                }
                 if (TmpBA.indexOf("\n00\r") == -1)
                 {
                     //Error
@@ -725,14 +760,14 @@ main(
                     if (iRemove == -1)
                     {
                         //Response not valid
-                        qDebug() << "Error whilst downloading, unknown response:" << TmpBA << "from device #" << (ucCPortNum+1);
+                        qDebug().nospace().noquote() << "Error whilst downloading, unknown response: " << TmpBA << " from device #" << (ucCPortNum+1);
                         ClosePorts(ucNumPorts);
                         return ERROR_CODE_DOWNLOAD_FAIL;
                     }
                     iRemove += 4;
                     TmpBA = TmpBA.mid(iRemove, 4);
                     TmpBA.prepend("0x");
-                    qDebug() << "Error response during download:" << TmpBA << "from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Error response during download: " << TmpBA << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_DOWNLOAD_ERROR;
                 }
@@ -745,10 +780,16 @@ main(
             ++ucCPortNum;
         }
         Sent += intFWRHSize;
-        if (ucExtraVerbose > 1)
+
+        //Check if percentage download of file should be outputted
+        if (Sent >= NextPercentStep)
         {
-            //Additional verbose debugging
-            qDebug() << QString(TmpBA);
+            while (Sent >= NextPercentStep)
+            {
+                NextPercentStep += PercentStep;
+            }
+            unsigned int CurrentStep = ((Sent * 10 / PercentStep)/10)*10;
+            qDebug().nospace().noquote() << "Downloaded " << CurrentStep << "% of data to modules...";
         }
     }
 
@@ -773,6 +814,7 @@ main(
             baTmpBuffer.clear();
             bModuleTimeout = false;
             baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+            tmrTimeoutTimer.start();
             while (baTmpBuffer.indexOf("\n00\r") == -1)
             {
                 //Wait for two line ends
@@ -785,6 +827,7 @@ main(
                 SerialHandles[ucCPortNum].waitForReadyRead(20);
                 baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
             }
+            tmrTimeoutTimer.stop();
 
             //Check response
             QByteArray TmpBA = SerialHandles[ucCPortNum].readAll();
@@ -795,14 +838,14 @@ main(
                 if (iRemove == -1)
                 {
                     //Response not valid
-                    qDebug() << "Error whilst closing file handle, unknown response:" << TmpBA << "from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Error whilst closing file handle, unknown response: " << TmpBA << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_FILECLOSE_FAIL;
                 }
                 iRemove += 4;
                 TmpBA = TmpBA.mid(iRemove, 4);
                 TmpBA.prepend("0x");
-                qDebug() << "Error response whilst closing file handle:" << TmpBA << "from device #" << (ucCPortNum+1);
+                qDebug().nospace().noquote() << "Error response whilst closing file handle: " << TmpBA << " from device #" << (ucCPortNum+1);
                 ClosePorts(ucNumPorts);
                 return ERROR_CODE_FILECLOSE_ERROR;
             }
@@ -823,7 +866,7 @@ main(
             //File checksum
             if (ucExtraVerbose > 0)
             {
-                qDebug() << "Testing module checksums against target:" << strChecksum;
+                qDebug().nospace().noquote() << "Testing module checksums against target: " << strChecksum;
             }
 
             ucCPortNum = 0;
@@ -836,6 +879,7 @@ main(
                 baTmpBuffer.clear();
                 bModuleTimeout = false;
                 baTmpBuffer = SerialHandles[ucCPortNum].peek(30);
+                tmrTimeoutTimer.start();
                 while (baTmpBuffer.indexOf("\n00\r") == -1)
                 {
                     //Wait for two line ends
@@ -848,6 +892,7 @@ main(
                     SerialHandles[ucCPortNum].waitForReadyRead(20);
                     baTmpBuffer = SerialHandles[ucCPortNum].peek(30);
                 }
+                tmrTimeoutTimer.stop();
 
                 //Check module response
                 QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
@@ -855,7 +900,7 @@ main(
                 if (iRemove == -1)
                 {
                     //Checksum not found
-                    qDebug() << "Module checksum response not valid:" << RecDat << "from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Module checksum response not valid: " << RecDat << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_CHECKSUM_ERROR;
                 }
@@ -865,7 +910,7 @@ main(
                 if (RecDat != strChecksum.toUtf8())
                 {
                     //File checksum mismatch
-                    qDebug() << "Downloaded file checksum does not match:" << RecDat << "from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Downloaded file checksum does not match: " << RecDat << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_CHECKSUM_FAIL;
                 }
@@ -890,6 +935,7 @@ main(
                 baTmpBuffer.clear();
                 bModuleTimeout = false;
                 baTmpBuffer = SerialHandles[ucCPortNum].peek(100);
+                tmrTimeoutTimer.start();
                 while (baTmpBuffer.indexOf("\n00\r") == -1)
                 {
                     //Wait for two line ends
@@ -902,13 +948,14 @@ main(
                     SerialHandles[ucCPortNum].waitForReadyRead(20);
                     baTmpBuffer = SerialHandles[ucCPortNum].peek(100);
                 }
+                tmrTimeoutTimer.stop();
 
                 //Check module response
                 QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
                 if (!(RecDat.indexOf(strRenameFilename) > 0))
                 {
                     //File didn't download
-                    qDebug() << "Downloaded file is missing from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Downloaded file is missing from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_FILE_NOT_DOWNLOADED;
                 }
@@ -957,7 +1004,7 @@ main(
             if (match3.hasMatch())
             {
                 //File didn't run successfully
-                qDebug() << "Downloaded file failed to run on device #" << (ucCPortNum+1) << "- Error code:" << match3.captured(1);
+                qDebug().nospace().noquote() << "Downloaded file failed to run on device #" << (ucCPortNum+1) << ", Error code: " << match3.captured(1);
                 ClosePorts(ucNumPorts);
                 return ERROR_CODE_FILE_NOT_DOWNLOADED;
             }
