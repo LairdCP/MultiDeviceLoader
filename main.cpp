@@ -437,7 +437,7 @@ main(
         //Wait for the module to output the data
         baTmpBuffer.clear();
         bModuleTimeout = false;
-        baTmpBuffer = SerialHandles[0].peek(60);
+        baTmpBuffer = SerialHandles[0].readAll();
         tmrTimeoutTimer.start();
         while (baTmpBuffer.indexOf("\n00\r") == -1 || baTmpBuffer.indexOf("\n00\r", baTmpBuffer.indexOf("\n00\r")+4) == -1)
         {
@@ -449,7 +449,7 @@ main(
                 break;
             }
             SerialHandles[0].waitForReadyRead(20);
-            baTmpBuffer = SerialHandles[0].peek(60);
+            baTmpBuffer.append(SerialHandles[0].readAll());
         }
         tmrTimeoutTimer.stop();
 
@@ -461,16 +461,13 @@ main(
             return ERROR_CODE_XCOMPILE_DETAILS_FAILED;
         }
 
-        //Read all data in from the port
-        QByteArray RecDat = SerialHandles[0].readAll();
-
         //Set regex dot to match everything
         rxExp1.setPatternOptions(QRegularExpression::DotMatchesEverythingOption);
         rxExp2.setPatternOptions(QRegularExpression::DotMatchesEverythingOption);
 
         //Match regex
-        QRegularExpressionMatch match1 = rxExp1.match(RecDat);
-        QRegularExpressionMatch match2 = rxExp2.match(RecDat);
+        QRegularExpressionMatch match1 = rxExp1.match(baTmpBuffer);
+        QRegularExpressionMatch match2 = rxExp2.match(baTmpBuffer);
 
         //Do we have a match?
         if (!match1.hasMatch() || !match2.hasMatch())
@@ -556,6 +553,15 @@ main(
 #endif
     }
 
+    //Clear buffers
+    ucCPortNum = 0;
+    while (ucCPortNum < ucNumPorts)
+    {
+        SerialHandles[ucCPortNum].readAll();
+        SerialHandles[ucCPortNum].flush();
+        ++ucCPortNum;
+    }
+
     //Get hex data from file
     if (ucExtraVerbose > 0)
     {
@@ -638,7 +644,7 @@ main(
             while (SerialHandles[ucCPortNum].waitForReadyRead(250));
         }
 
-        //Clear any previos response
+        //Clear any previous response
         SerialHandles[ucCPortNum].readAll();
 
         //Open files for writing
@@ -654,7 +660,7 @@ main(
             //Wait for the module to respond
             baTmpBuffer.clear();
             bModuleTimeout = false;
-            baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+            baTmpBuffer = SerialHandles[ucCPortNum].readAll();
             tmrTimeoutTimer.start();
             while (baTmpBuffer.indexOf("\n00\r") == -1)
             {
@@ -666,27 +672,26 @@ main(
                     break;
                 }
                 SerialHandles[ucCPortNum].waitForReadyRead(20);
-                baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+                baTmpBuffer.append(SerialHandles[ucCPortNum].readAll());
             }
             tmrTimeoutTimer.stop();
 
             //Check response
-            QByteArray TmpBA = SerialHandles[ucCPortNum].readAll();
-            if (TmpBA.indexOf("\n00\r") == -1)
+            if (baTmpBuffer.indexOf("\n00\r") == -1)
             {
                 //Error
-                int iRemove = TmpBA.indexOf("\n01\t");
+                int iRemove = baTmpBuffer.indexOf("\n01\t");
                 if (iRemove == -1)
                 {
                     //Response not valid
-                    qDebug().nospace().noquote() << "Error whilst opening file, unknown response: " << TmpBA << " from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Error whilst opening file, unknown response: " << baTmpBuffer << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_DOWNLOAD_FAIL;
                 }
                 iRemove += 4;
-                TmpBA = TmpBA.mid(iRemove, 4);
-                TmpBA.prepend("0x");
-                qDebug().nospace().noquote() << "Error response during file opening: " << TmpBA << " from device #" << (ucCPortNum+1);
+                baTmpBuffer = baTmpBuffer.mid(iRemove, 4);
+                baTmpBuffer.prepend("0x");
+                qDebug().nospace().noquote() << "Error response during file opening: " << baTmpBuffer << " from device #" << (ucCPortNum+1);
                 ClosePorts(ucNumPorts);
                 return ERROR_CODE_DOWNLOAD_ERROR;
             }
@@ -741,7 +746,7 @@ main(
                 //Wait for the module to respond
                 baTmpBuffer.clear();
                 bModuleTimeout = false;
-                baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+                baTmpBuffer = SerialHandles[ucCPortNum].readAll();
                 tmrTimeoutTimer.start();
                 while (baTmpBuffer.indexOf("\n00\r") == -1)
                 {
@@ -753,32 +758,31 @@ main(
                         break;
                     }
                     SerialHandles[ucCPortNum].waitForReadyRead(20);
-                    baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+                    baTmpBuffer.append(SerialHandles[ucCPortNum].readAll());
                 }
                 tmrTimeoutTimer.stop();
 
                 //Check response
-                TmpBA = SerialHandles[ucCPortNum].readAll();
                 if (ucExtraVerbose > 1)
                 {
                     //Additional verbose debugging
-                    qDebug().nospace().noquote() << "Module #" << (ucCPortNum+1) << " Rx: " << QString(TmpBA).replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+                    qDebug().nospace().noquote() << "Module #" << (ucCPortNum+1) << " Rx: " << QString(baTmpBuffer).replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
                 }
-                if (TmpBA.indexOf("\n00\r") == -1)
+                if (baTmpBuffer.indexOf("\n00\r") == -1)
                 {
                     //Error
-                    int iRemove = TmpBA.indexOf("\n01\t");
+                    int iRemove = baTmpBuffer.indexOf("\n01\t");
                     if (iRemove == -1)
                     {
                         //Response not valid
-                        qDebug().nospace().noquote() << "Error whilst downloading, unknown response: " << TmpBA << " from device #" << (ucCPortNum+1);
+                        qDebug().nospace().noquote() << "Error whilst downloading, unknown response: " << baTmpBuffer << " from device #" << (ucCPortNum+1);
                         ClosePorts(ucNumPorts);
                         return ERROR_CODE_DOWNLOAD_FAIL;
                     }
                     iRemove += 4;
-                    TmpBA = TmpBA.mid(iRemove, 4);
-                    TmpBA.prepend("0x");
-                    qDebug().nospace().noquote() << "Error response during download: " << TmpBA << " from device #" << (ucCPortNum+1);
+                    baTmpBuffer = baTmpBuffer.mid(iRemove, 4);
+                    baTmpBuffer.prepend("0x");
+                    qDebug().nospace().noquote() << "Error response during download: " << baTmpBuffer << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_DOWNLOAD_ERROR;
                 }
@@ -824,7 +828,7 @@ main(
             //Wait for the module to respond
             baTmpBuffer.clear();
             bModuleTimeout = false;
-            baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+            baTmpBuffer = SerialHandles[ucCPortNum].readAll();
             tmrTimeoutTimer.start();
             while (baTmpBuffer.indexOf("\n00\r") == -1)
             {
@@ -836,27 +840,26 @@ main(
                     break;
                 }
                 SerialHandles[ucCPortNum].waitForReadyRead(20);
-                baTmpBuffer = SerialHandles[ucCPortNum].peek(20);
+                baTmpBuffer.append(SerialHandles[ucCPortNum].readAll());
             }
             tmrTimeoutTimer.stop();
 
             //Check response
-            QByteArray TmpBA = SerialHandles[ucCPortNum].readAll();
-            if (TmpBA.indexOf("\n00\r") == -1)
+            if (baTmpBuffer.indexOf("\n00\r") == -1)
             {
                 //Error
-                int iRemove = TmpBA.indexOf("\n01\t");
+                int iRemove = baTmpBuffer.indexOf("\n01\t");
                 if (iRemove == -1)
                 {
                     //Response not valid
-                    qDebug().nospace().noquote() << "Error whilst closing file handle, unknown response: " << TmpBA << " from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Error whilst closing file handle, unknown response: " << baTmpBuffer << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_FILECLOSE_FAIL;
                 }
                 iRemove += 4;
-                TmpBA = TmpBA.mid(iRemove, 4);
-                TmpBA.prepend("0x");
-                qDebug().nospace().noquote() << "Error response whilst closing file handle: " << TmpBA << " from device #" << (ucCPortNum+1);
+                baTmpBuffer = baTmpBuffer.mid(iRemove, 4);
+                baTmpBuffer.prepend("0x");
+                qDebug().nospace().noquote() << "Error response whilst closing file handle: " << baTmpBuffer << " from device #" << (ucCPortNum+1);
                 ClosePorts(ucNumPorts);
                 return ERROR_CODE_FILECLOSE_ERROR;
             }
@@ -889,7 +892,7 @@ main(
                 //Wait for the module to respond
                 baTmpBuffer.clear();
                 bModuleTimeout = false;
-                baTmpBuffer = SerialHandles[ucCPortNum].peek(30);
+                baTmpBuffer = SerialHandles[ucCPortNum].readAll();
                 tmrTimeoutTimer.start();
                 while (baTmpBuffer.indexOf("\n00\r") == -1)
                 {
@@ -901,27 +904,26 @@ main(
                         break;
                     }
                     SerialHandles[ucCPortNum].waitForReadyRead(20);
-                    baTmpBuffer = SerialHandles[ucCPortNum].peek(30);
+                    baTmpBuffer.append(SerialHandles[ucCPortNum].readAll());
                 }
                 tmrTimeoutTimer.stop();
 
                 //Check module response
-                QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
-                int iRemove = RecDat.indexOf("\t49452\t");
+                int iRemove = baTmpBuffer.indexOf("\t49452\t");
                 if (iRemove == -1)
                 {
                     //Checksum not found
-                    qDebug().nospace().noquote() << "Module checksum response not valid: " << RecDat << " from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Module checksum response not valid: " << baTmpBuffer << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_CHECKSUM_ERROR;
                 }
                 iRemove += 7;
-                RecDat = RecDat.mid(iRemove, 4);
-                RecDat.prepend("0x");
-                if (RecDat != strChecksum.toUtf8())
+                baTmpBuffer = baTmpBuffer.mid(iRemove, 4);
+                baTmpBuffer.prepend("0x");
+                if (baTmpBuffer != strChecksum.toUtf8())
                 {
                     //File checksum mismatch
-                    qDebug().nospace().noquote() << "Downloaded file checksum does not match: " << RecDat << " from device #" << (ucCPortNum+1);
+                    qDebug().nospace().noquote() << "Downloaded file checksum does not match: " << baTmpBuffer << " from device #" << (ucCPortNum+1);
                     ClosePorts(ucNumPorts);
                     return ERROR_CODE_CHECKSUM_FAIL;
                 }
@@ -945,7 +947,7 @@ main(
                 //Wait for the module to respond
                 baTmpBuffer.clear();
                 bModuleTimeout = false;
-                baTmpBuffer = SerialHandles[ucCPortNum].peek(100);
+                baTmpBuffer = SerialHandles[ucCPortNum].readAll();
                 tmrTimeoutTimer.start();
                 while (baTmpBuffer.indexOf("\n00\r") == -1)
                 {
@@ -957,13 +959,12 @@ main(
                         break;
                     }
                     SerialHandles[ucCPortNum].waitForReadyRead(20);
-                    baTmpBuffer = SerialHandles[ucCPortNum].peek(100);
+                    baTmpBuffer.append(SerialHandles[ucCPortNum].readAll());
                 }
                 tmrTimeoutTimer.stop();
 
                 //Check module response
-                QByteArray RecDat = SerialHandles[ucCPortNum].readAll();
-                if (!(RecDat.indexOf(strRenameFilename) > 0))
+                if (!(baTmpBuffer.indexOf(strRenameFilename) > 0))
                 {
                     //File didn't download
                     qDebug().nospace().noquote() << "Downloaded file is missing from device #" << (ucCPortNum+1);
