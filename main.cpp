@@ -41,6 +41,7 @@
  * OpenMode=n         0 = open files normally (will fail if file already exists, default), 1 = delete file before opening
  * DownloadCheck=n    0 = do not check download progress, 1 = check for error responses when downloading files (default)
  * SkipStartBreak=n   0 = send a BREAK at startup to modules to reset them (default), 1 = do not send a BREAK at startup to modules
+ * EraseWaitTime=n    Time (in ms) to wait for a response after sending an erase command
  */
 
 /******************************************************************************/
@@ -86,6 +87,7 @@ main(
     QTimer tmrTimeoutTimer; //Response timeout timer
     bool bModuleTimeout; //Set to true if a module timeout occurs
     bool bSkipStartBreak = false; //True if the initial startup BREAK should be skipped
+    qint16 nEraseWaitTime = 1000; //Time (in ms) to wait after sending the erase command
 
     //Output version
     qDebug().nospace().noquote() << "Laird MultiDeviceLoader " << AppVersion << " built " << __DATE__;
@@ -300,12 +302,21 @@ main(
             //SkipStartBreak
             bSkipStartBreak = (slArgs[chi].right(1) == "0" ? false : true);
         }
+        else if (slArgs[chi].left(14).toUpper() == "ERASEWAITTIME=")
+        {
+            //Erase wait time configuration
+            nEraseWaitTime = slArgs[chi].mid(14, -1).toInt();
+            if (nEraseWaitTime < 1)
+            {
+                nEraseWaitTime = 1;
+            }
+        }
         ++chi;
     }
     if (chi == 1)
     {
         //No parameters passed
-        qDebug() << "No parameters passed to executable, exiting.\r\nQuick help:\r\n  RunOnExit=n      1 = run application when downloaded, 0 = do not run application when downloaded (default)\r\n  EraseFS=n        1 = erase file-system, 0 = do not erase file-system (default)\r\n  XCompile=n       1 = XCompile source and download application (Windows only), 0 = download application as-is\r\n  FlowControl=n    1 = Hardware flow control (default), 2 = Software flow control, 0 = No flow control\r\n  Baud=n           Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900/BL652/RM1xx)\r\n  DownloadFile=n   Path and filename to XCompile/download\r\n  RenameFile=n     Filename to download the file to the module as\r\n  PortFile=n       Path and filename to a port configuration file (not needed if Port=n is used)\r\n  Port=n           Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device] (not needed if PortFile=n is used)\r\n  Verbose=n        Output verbosity: 0 = none (default), 1 = normal, 2 = extra, 3 = extra and tx data\r\n  Verify=n         File verification: 0 = none, 1 = checks file exists on module after download (default), 2 = check using checksum, 3 = checks file exists on module and checks using checksum\r\n  XCompDir=n       Specifies the directory to XCompilers (Windows only)\r\n  AllowPortFail=n  1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)\r\n  FWRHSize=n       Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).\r\n  OpenMode=n       0 = open files normally (will fail if file already exists, default), 1 = delete file before opening\r\n  DownloadCheck=n  0 = do not check download progress, 1 = check for error responses when downloading files (default)\r\n  SkipStartBreak=n 0 = send a BREAK at startup to modules to reset them (default), 1 = do not send a BREAK at startup to modules\r\n";
+        qDebug() << "No parameters passed to executable, exiting.\r\nQuick help:\r\n  RunOnExit=n      1 = run application when downloaded, 0 = do not run application when downloaded (default)\r\n  EraseFS=n        1 = erase file-system, 0 = do not erase file-system (default)\r\n  XCompile=n       1 = XCompile source and download application (Windows only), 0 = download application as-is\r\n  FlowControl=n    1 = Hardware flow control (default), 2 = Software flow control, 0 = No flow control\r\n  Baud=n           Baud rate (300-921600, 9600 is default for BL600/BL620 and 115200 is default for BT900/BL652/RM1xx)\r\n  DownloadFile=n   Path and filename to XCompile/download\r\n  RenameFile=n     Filename to download the file to the module as\r\n  PortFile=n       Path and filename to a port configuration file (not needed if Port=n is used)\r\n  Port=n           Specify a port to use (can be specified multiple times for additional ports), Windows: COM[1-255], Linux: /dev/[device] (not needed if PortFile=n is used)\r\n  Verbose=n        Output verbosity: 0 = none (default), 1 = normal, 2 = extra, 3 = extra and tx data\r\n  Verify=n         File verification: 0 = none, 1 = checks file exists on module after download (default), 2 = check using checksum, 3 = checks file exists on module and checks using checksum\r\n  XCompDir=n       Specifies the directory to XCompilers (Windows only)\r\n  AllowPortFail=n  1 = continue running if some ports fail to open, 0 = quit program if any ports fail to open (default)\r\n  FWRHSize=n       Number of bytes to write per line to target devices. If a BL620-US is being used on GNU/Linux then setting this value to 50 might be required (default is 72, must be a multiple of 2).\r\n  OpenMode=n       0 = open files normally (will fail if file already exists, default), 1 = delete file before opening\r\n  DownloadCheck=n  0 = do not check download progress, 1 = check for error responses when downloading files (default)\r\n  SkipStartBreak=n 0 = send a BREAK at startup to modules to reset them (default), 1 = do not send a BREAK at startup to modules\r\n  EraseWaitTime=n    Time (in ms) to wait for a response after sending an erase command\r\n";
         return ERROR_CODE_NO_PARAMETERS;
     }
 
@@ -539,9 +550,9 @@ main(
 
         //Short wait for devices to recover
 #ifdef _WIN32
-        Sleep(1000);
+        Sleep(nEraseWaitTime);
 #else
-        usleep(1000000);
+        usleep(nEraseWaitTime * 1000);
 #endif
     }
 
